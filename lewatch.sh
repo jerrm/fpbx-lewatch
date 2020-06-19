@@ -4,11 +4,11 @@ fullme="$(realpath -- "$0")"
 baseme="$(basename -- "$0")"
 me="${baseme%.*}"
 
-rule="INPUT -p tcp --dport 80 -j ACCEPT -m comment --comment $me "
+rule="INPUT -p tcp --dport 80 -j ACCEPT -m comment --comment ${me// /_}"
 timeout=60
 
 addRule() {
-  echo "adding le rule"
+  echo "insert: $rule"
   iptables -w -C $rule 2>/dev/null || iptables -w -I $rule
   sleep $timeout
   deleteRule
@@ -16,7 +16,7 @@ addRule() {
 
 deleteRule() {
   while iptables -w -C $rule 2>/dev/null; do
-    echo deleting le rule
+    echo "delete: $rule"
     iptables -w -D $rule
     sleep 0.1
   done
@@ -42,14 +42,16 @@ install() {
     systemctl start incron
   }
   # monitor fpbx le web folders
-  echo '/var/www/html/.well-known/acme-challenge IN_CREATE,IN_DELETE "'$fullme'" "$@" "$#" "$%" "$&"' > /etc/incron.d/$me
-  echo '/var/www/html/.freepbx-known IN_CREATE,IN_DELETE "'$fullme'" "$@" "$#" "$%" "$&"' >> /etc/incron.d/$me
+  {
+    echo "/var/www/html/.well-known/acme-challenge IN_CREATE,IN_DELETE $(printf %q "$fullme") "'$@ $# $% $&'
+    echo "/var/www/html/.freepbx-known IN_CREATE,IN_DELETE $(printf %q "$fullme") "'$@ $# $% $&'
+  } > "/etc/incron.d/$me"
   exit 0
 }
 
 uninstall() {
   deleteRule
-  rm /etc/incron.d/$me
+  rm "/etc/incron.d/$me"
 }
 
 main() {
@@ -68,4 +70,4 @@ main() {
 [ "$1" = uninstall ]  && uninstall
 [ "$1" = deleterule ] && deleteRule
 [ "$1" = deleteRule ] && deleteRule
-main "$@" 2>&1 | /usr/bin/logger -t "$me[$$]" 
+main "$@" 2>&1 | /usr/bin/logger -t "${me// /_}[$$]" 
